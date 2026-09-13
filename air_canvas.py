@@ -165,10 +165,11 @@ class AirCanvas:
 
     def draw_palette_ui(self, frame: np.ndarray) -> np.ndarray:
         """Render the top interactive color palette overlay."""
-        h_bar = AppConfig.canvas.palette_height
-        overlay = frame.copy()
+        h_bar = min(AppConfig.canvas.palette_height, frame.shape[0])
+        sub = frame[0:h_bar, 0:self.width]
+        overlay = sub.copy()
         cv2.rectangle(overlay, (0, 0), (self.width, h_bar), (15, 15, 20), -1)
-        frame = cv2.addWeighted(overlay, 0.85, frame, 0.15, 0)
+        cv2.addWeighted(overlay, 0.85, sub, 0.15, 0, dst=sub)
 
         for item in self.palette_items:
             x1, y1, x2, y2 = item.rect

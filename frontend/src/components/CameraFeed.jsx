@@ -23,7 +23,6 @@ export const CameraFeed = () => {
   useEffect(() => {
     if (liveState.camera_active) {
       setStreamError(false);
-      setFeedKey(Date.now());
     }
   }, [liveState.camera_active]);
 

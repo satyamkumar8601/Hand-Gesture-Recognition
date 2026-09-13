@@ -160,8 +160,7 @@ class CameraService:
             return True
 
     def _capture_loop(self):
-        """Dedicated background loop continuously reading latest frame with frame pacing & watchdog."""
-        frame_interval = 1.0 / max(10, min(60, self.fps_limit))
+        """Dedicated background loop continuously reading freshest frame directly from camera sensor with zero buffer lag."""
         while self.running:
             if self.cap is None:
                 break
@@ -172,22 +171,17 @@ class CameraService:
                 threading.Thread(target=self.stop, daemon=True).start()
                 break
 
-            # Direct hardware grab with micro-sleep pacing to prevent CPU pegging
-            loop_start = time.perf_counter()
             try:
-                if self.cap is not None and self.cap.grab():
-                    ret, frame = self.cap.retrieve()
+                if self.cap is not None:
+                    # cap.read() blocks naturally until hardware delivers next frame (~30-60 FPS)
+                    ret, frame = self.cap.read()
                     if ret and frame is not None:
                         with self.lock:
-                            self.ret = ret
+                            self.ret = True
                             self.frame = frame
                             self.frame_id += 1
-                    # Frame pace to hardware rate (~30fps) - eliminates 100% CPU busy-spin
-                    elapsed = time.perf_counter() - loop_start
-                    sleep_time = max(0.001, frame_interval - elapsed)
-                    time.sleep(sleep_time)
-                else:
-                    time.sleep(0.005)
+                    else:
+                        time.sleep(0.005)
             except Exception:
                 time.sleep(0.01)
 

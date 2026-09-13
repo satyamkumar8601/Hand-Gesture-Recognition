@@ -217,19 +217,30 @@ export const AppProvider = ({ children }) => {
             return prev;
           });
           setLiveState(prev => {
+            const gestureChanged = prev.primary_gesture !== data.primary_gesture;
+            const handChanged = prev.hand_detected !== data.hand_detected;
+            const cameraChanged = prev.camera_active !== data.camera_active;
+            const modeChanged = prev.mode !== data.mode;
+            const mouseChanged = prev.mouse_enabled !== data.mouse_enabled;
+            const whiteboardChanged = prev.whiteboard_mode !== data.whiteboard_mode;
+            const colorChanged = prev.canvas_color !== data.canvas_color;
+            const confDiff = Math.abs((prev.confidence || 0) - (data.confidence || 0)) >= 5;
+            const fpsDiff = Math.abs((prev.fps || 0) - (data.fps || 0)) >= 3;
+            const gripDiff = Math.abs((prev.rehab_grip_closure || 0) - (data.rehab_grip_closure || 0)) >= 4;
+
             if (
-              prev.camera_active === data.camera_active &&
-              prev.primary_gesture === data.primary_gesture &&
-              prev.confidence === data.confidence &&
-              prev.hand_detected === data.hand_detected &&
-              prev.fps === data.fps &&
-              prev.mode === data.mode &&
-              prev.rehab_grip_closure === data.rehab_grip_closure &&
-              prev.mouse_enabled === data.mouse_enabled &&
-              prev.canvas_color === data.canvas_color &&
-              prev.whiteboard_mode === data.whiteboard_mode
+              !gestureChanged &&
+              !handChanged &&
+              !cameraChanged &&
+              !modeChanged &&
+              !mouseChanged &&
+              !whiteboardChanged &&
+              !colorChanged &&
+              !confDiff &&
+              !fpsDiff &&
+              !gripDiff
             ) {
-              return prev;
+              return prev; // Skip re-rendering when telemetry has not meaningfully changed
             }
             return data;
           });
@@ -243,7 +254,7 @@ export const AppProvider = ({ children }) => {
       }
 
       if (isSubscribed) {
-        const delay = liveState.camera_active ? 150 : 2500;
+        const delay = liveState.camera_active ? 280 : 2500;
         timerId = setTimeout(poll, delay);
       }
     };

@@ -109,11 +109,14 @@ class HUDRenderer:
         x = self.width - card_w - margin
         y = margin + slot_idx * (card_h + 10)
 
-        # Glass background
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (x, y), (x + card_w, y + card_h), (20, 18, 22), -1)
-        frame = cv2.addWeighted(overlay, 0.75, frame, 0.25, 0)
-        cv2.rectangle(frame, (x, y), (x + card_w, y + card_h), (60, 60, 80), 1)
+        # Glass background (ROI slice optimization avoids full frame memory copy)
+        h_f, w_f = frame.shape[:2]
+        if y + card_h <= h_f and x + card_w <= w_f and x >= 0 and y >= 0:
+            sub = frame[y : y + card_h, x : x + card_w]
+            overlay = sub.copy()
+            cv2.rectangle(overlay, (0, 0), (card_w, card_h), (20, 18, 22), -1)
+            cv2.addWeighted(overlay, 0.75, sub, 0.25, 0, dst=sub)
+            cv2.rectangle(frame, (x, y), (x + card_w, y + card_h), (60, 60, 80), 1)
 
         # Header: Hand identity
         accent = AppConfig.colors.CYAN if hand.handedness == "Right" else AppConfig.colors.NEON_PINK
