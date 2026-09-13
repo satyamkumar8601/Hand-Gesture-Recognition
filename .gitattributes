@@ -1,0 +1,21 @@
+# Ensure consistent line endings across platforms
+* text=auto
+
+# Windows Batch scripts must preserve CRLF line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Shell scripts must preserve LF line endings
+*.sh text eol=lf
+
+# Binary model files and task assets
+*.task binary
+*.pkl binary
+*.joblib binary
+*.h5 binary
+*.onnx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary

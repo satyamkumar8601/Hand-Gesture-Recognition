@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs & Bundles
+dist/
+frontend/dist/
+build/
+*.egg-info/
+.eggs/
+
+# Vercel & Deployment
+.vercel/
+.output/
+
+# Python & Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environments & Virtual Envs
+.env
+.env.local
+.env.*.local
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite & Databases (Auto-generated at runtime)
+backend/database/*.db
+backend/database/*.db-journal
+backend/database/*.db-wal
+backend/database/*.db-shm
+*.sqlite3
+
+# Logs & Temporary Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+uvicorn_*.log
+scratch_*.log
+
+# Operating System & IDEs
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Screenshots & Snapshots (Keep repo clean)
+screenshots/*.png
+screenshots/*.jpg
+snapshots/*.png
+snapshots/*.jpg
+!screenshots/.gitkeep
+!snapshots/.gitkeep

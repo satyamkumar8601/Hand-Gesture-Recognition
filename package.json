@@ -1,0 +1,22 @@
+{
+  "name": "omnigesture-ai",
+  "version": "2.0.0",
+  "private": true,
+  "description": "AI-Powered Real-time Hand Gesture Recognition Studio",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "preview": "npm run preview --prefix frontend"
+  },
+  "keywords": [
+    "gesture-recognition",
+    "machine-learning",
+    "mediapipe",
+    "opencv",
+    "react",
+    "vite",
+    "fastapi"
+  ],
+  "author": "",
+  "license": "MIT"
+}
