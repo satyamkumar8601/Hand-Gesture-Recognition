@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🖐️ AI-Powered Hand Gesture Recognition System
 ### Real-Time Computer Vision & Machine Learning Studio using OpenCV, MediaPipe & Scikit-Learn
 
@@ -323,3 +324,6 @@ In **OmniGesture AI**:
 ## 🛡️ License
 
 MIT License &copy; 2026 OmniGesture AI Contributors. Built for computer vision, machine learning, and HCI research.
+=======
+# Hand-Gesture-Recognition
+>>>>>>> b58e1945a195a726313980174731bc33c7df999f
