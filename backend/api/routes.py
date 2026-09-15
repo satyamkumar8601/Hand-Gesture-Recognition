@@ -160,7 +160,8 @@ def fetch_settings():
 
 @router.post("/api/settings")
 def update_settings(payload: SettingsPayload):
-    for k, v in payload.dict().items():
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    for k, v in data.items():
         save_setting(k, str(v))
     return {"success": True, "settings": get_all_settings()}
 

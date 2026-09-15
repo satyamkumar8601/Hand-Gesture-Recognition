@@ -37,15 +37,23 @@ except ImportError:
 
 # Import interactive studio modules
 try:
-    from air_canvas import AirCanvas
-    from virtual_mouse import VirtualMouse
-    from rehab_tracker import RehabTracker
-    from hud_renderer import HUDRenderer
-    from hand_tracker import HandData
+    from backend.air_canvas import AirCanvas
+    from backend.virtual_mouse import VirtualMouse
+    from backend.rehab_tracker import RehabTracker
+    from backend.hud_renderer import HUDRenderer
+    from backend.hand_tracker import HandData
     MODULES_AVAILABLE = True
-except Exception as e:
-    print(f"[PredictionService Warning] Interactive modules import error: {e}")
-    MODULES_AVAILABLE = False
+except ImportError:
+    try:
+        from air_canvas import AirCanvas
+        from virtual_mouse import VirtualMouse
+        from rehab_tracker import RehabTracker
+        from hud_renderer import HUDRenderer
+        from hand_tracker import HandData
+        MODULES_AVAILABLE = True
+    except Exception as e:
+        print(f"[PredictionService Warning] Interactive modules import error: {e}")
+        MODULES_AVAILABLE = False
 
 
 def to_hand_data(h: HandLandmarksData) -> Any:

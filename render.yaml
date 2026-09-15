@@ -1,3 +1,5 @@
+# Render Infrastructure Blueprint
+# Auto-deploys the OmniGesture AI FastAPI Backend
 services:
   - type: web
     name: omnigesture-backend
@@ -6,6 +8,7 @@ services:
     plan: free
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

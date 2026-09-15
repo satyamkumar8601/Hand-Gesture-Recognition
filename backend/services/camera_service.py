@@ -100,8 +100,8 @@ class CameraService:
                 time.sleep(0.1)
 
             if cap is None or not cap.isOpened():
-                print(f"[CameraService Error] Unable to open camera on indices {indices_to_try}.")
-                return False
+                print(f"[CameraService Warning] Unable to open camera on indices {indices_to_try}.")
+                return self._start_simulated_cloud_feed()
 
             # Configure properties safely (certain drivers crash if properties are set unsupported)
             try:
@@ -233,10 +233,70 @@ class CameraService:
                 time.sleep(0.1)
                 print("[CameraService] Camera released & hardware turned OFF.")
 
+    def _create_cloud_standby_frame(self, t: float) -> np.ndarray:
+        h, w = self.height, self.width
+        frame = np.full((h, w, 3), 20, dtype=np.uint8)
+        # Subtle grid
+        frame[::40, :] = np.clip(frame[::40, :] + 10, 0, 255)
+        frame[:, ::40] = np.clip(frame[:, ::40, :] + 10, 0, 255)
+
+        # Center card
+        cw, ch = min(540, w - 30), min(230, h - 30)
+        cx1 = max(0, (w - cw) // 2)
+        cy1 = max(0, (h - ch) // 2)
+        cv2.rectangle(frame, (cx1, cy1), (cx1 + cw, cy1 + ch), (30, 28, 38), -1)
+        cv2.rectangle(frame, (cx1, cy1), (cx1 + cw, cy1 + ch), (241, 102, 99), 2)
+
+        # Title
+        cv2.putText(frame, "OMNIGESTURE CLOUD SERVER", (cx1 + 20, cy1 + 42),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.68, (255, 255, 255), 2, cv2.LINE_AA)
+
+        # Pulsing dot
+        pulse = int(140 + 115 * np.sin(t * 3.5))
+        cv2.circle(frame, (cx1 + 30, cy1 + 78), 7, (94, 197, pulse), -1, cv2.LINE_AA)
+        cv2.putText(frame, "Cloud Server Active (Render / Headless)", (cx1 + 48, cy1 + 84),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (94, 197, 34), 1, cv2.LINE_AA)
+
+        # Information
+        cv2.putText(frame, "No physical webcam attached in cloud VM.", (cx1 + 20, cy1 + 120),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.44, (200, 200, 200), 1, cv2.LINE_AA)
+        cv2.putText(frame, "Run locally for USB webcam or use Web API endpoints.", (cx1 + 20, cy1 + 148),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.44, (160, 160, 160), 1, cv2.LINE_AA)
+
+        # Live timestamp
+        time_str = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(t))
+        cv2.putText(frame, time_str, (cx1 + 20, cy1 + 190),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 235, 0), 1, cv2.LINE_AA)
+        return frame
+
+    def _simulated_cloud_loop(self):
+        while self.running:
+            now = time.time()
+            frame = self._create_cloud_standby_frame(now)
+            with self.lock:
+                self.frame = frame
+                self.ret = True
+                self.frame_id += 1
+            time.sleep(0.066)  # ~15 FPS
+
+    def _start_simulated_cloud_feed(self) -> bool:
+        print("[CameraService] No physical camera found. Starting simulated cloud standby feed.")
+        first_frame = self._create_cloud_standby_frame(time.time())
+        with self.lock:
+            self.cap = None
+            self.frame = first_frame
+            self.ret = True
+            self.frame_id += 1
+            self.running = True
+            self.last_access_time = time.time()
+            self.thread = threading.Thread(target=self._simulated_cloud_loop, daemon=True)
+            self.thread.start()
+        return True
+
     def add_subscriber(self):
         self.last_access_time = time.time()
         self.active_subscribers += 1
-        if not self.running or self.cap is None or not self.cap.isOpened():
+        if not self.running:
             self.start()
 
     def remove_subscriber(self):
@@ -245,4 +305,4 @@ class CameraService:
             self.stop()
 
     def is_active(self) -> bool:
-        return self.running and self.cap is not None and self.cap.isOpened()
+        return self.running and self.frame is not None

@@ -71,6 +71,19 @@ app.include_router(core_router)
 app.include_router(gesture_router)
 
 
+@app.get("/")
+def root():
+    """Root health and service discovery endpoint for Render and API clients."""
+    return {
+        "service": "AI-Powered Hand Gesture Recognition API",
+        "status": "online",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "health": "/api/health",
+        "video_feed": "/video_feed",
+    }
+
+
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))

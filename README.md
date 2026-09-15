@@ -321,9 +321,29 @@ In **OmniGesture AI**:
 
 ---
 
+## 🚀 Cloud Deployment: Vercel + Render
+
+### 1. Render (FastAPI Backend)
+- **Repository**: Connect your GitHub repository.
+- **Root Directory**: Leave **empty / blank** (do NOT enter `ML_PROJECT`).
+- **Environment**: `Python`
+- **Build Command**: `pip install -r backend/requirements.txt`
+- **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `PYTHON_VERSION`: `3.11.9`
+
+### 2. Vercel (React Frontend)
+- **Repository**: Connect your GitHub repository.
+- **Framework Preset**: `Vite`
+- **Root Directory**: `.` (or `frontend`)
+- **Environment Variables**:
+  - `VITE_API_URL`: Your Render service URL (e.g., `https://hand-gesture-recognition.onrender.com`)
+- **In-App Dynamic Switching**:
+  - Navigate to the **Settings** page in the web app.
+  - Paste your Render backend URL into the **FastAPI Backend Connection** card and click **Apply** to test and persist the connection live!
+
+---
+
 ## 🛡️ License
 
 MIT License &copy; 2026 OmniGesture AI Contributors. Built for computer vision, machine learning, and HCI research.
-=======
-# Hand-Gesture-Recognition
->>>>>>> b58e1945a195a726313980174731bc33c7df999f
