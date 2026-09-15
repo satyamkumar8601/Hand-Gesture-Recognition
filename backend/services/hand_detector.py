@@ -79,9 +79,15 @@ class HandDetector:
         self._last_ts = now_ms
         timestamp_ms = now_ms
 
-        # Downscale for ultra-fast MediaPipe inference (320x240 is 3x faster)
+        # Downscale proportionally for ultra-fast MediaPipe inference without aspect distortion
         inf_w, inf_h = self.inference_size
-        small_frame = cv2.resize(frame, (inf_w, inf_h), interpolation=cv2.INTER_LINEAR)
+        if w > inf_w or h > inf_h:
+            scale_f = min(inf_w / w, inf_h / h)
+            nw = max(1, int(w * scale_f))
+            nh = max(1, int(h * scale_f))
+            small_frame = cv2.resize(frame, (nw, nh), interpolation=cv2.INTER_LINEAR)
+        else:
+            small_frame = frame
         rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
@@ -108,10 +114,14 @@ class HandDetector:
             curr_pixels[:, 0] = raw_norm[:, 0] * w
             curr_pixels[:, 1] = raw_norm[:, 1] * h
 
-            # Exponential Moving Average (EMA) smoothing to eliminate micro-jitter
+            # Exponential Moving Average (EMA) smoothing with dynamic fast-motion snap
             if handedness in self._prev_landmarks:
-                alpha = self.smoothing_factor
-                smoothed_pixels = alpha * curr_pixels + (1.0 - alpha) * self._prev_landmarks[handedness]
+                wrist_movement = float(np.linalg.norm(curr_pixels[0] - self._prev_landmarks[handedness][0]))
+                if wrist_movement > 50.0:
+                    smoothed_pixels = curr_pixels
+                else:
+                    alpha = self.smoothing_factor
+                    smoothed_pixels = alpha * curr_pixels + (1.0 - alpha) * self._prev_landmarks[handedness]
             else:
                 smoothed_pixels = curr_pixels
             self._prev_landmarks[handedness] = smoothed_pixels

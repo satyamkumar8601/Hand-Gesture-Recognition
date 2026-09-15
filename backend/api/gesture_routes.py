@@ -327,6 +327,9 @@ def predict_frame(payload: PredictFramePayload):
         if frame is None:
             return JSONResponse(status_code=400, content={"error": "Invalid image data"})
 
+        # Flip horizontally to match mirror interaction and training coordinates
+        frame = cv2.flip(frame, 1)
+
         from services.prediction_service import PredictionService
         ps = PredictionService.get_instance()
         if ps.hand_detector is None:

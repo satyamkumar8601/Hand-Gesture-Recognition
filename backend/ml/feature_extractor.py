@@ -67,30 +67,51 @@ class FeatureExtractor:
     def extract_finger_states(landmarks_pixel: np.ndarray, handedness: str = "Right") -> FingerStates:
         """
         Determine whether each of the 5 fingers is open/extended or closed/curled.
-        Uses scale-normalized distance and joint relative geometry.
+        Uses scale-normalized distance and joint relative geometry invariant to hand rotation.
         """
         pts = landmarks_pixel
         wrist = pts[0]
         middle_mcp = pts[9]
         scale = max(float(np.linalg.norm(middle_mcp - wrist)), 1.0)
 
-        # Non-thumb fingers: tip y vs pip y, and distance from wrist to tip vs wrist to pip
-        index_open = (np.linalg.norm(pts[8] - wrist) > np.linalg.norm(pts[6] - wrist) * 1.05) and (pts[8][1] < pts[6][1] + scale * 0.15)
-        middle_open = (np.linalg.norm(pts[12] - wrist) > np.linalg.norm(pts[10] - wrist) * 1.05) and (pts[12][1] < pts[10][1] + scale * 0.15)
-        ring_open = (np.linalg.norm(pts[16] - wrist) > np.linalg.norm(pts[14] - wrist) * 1.05) and (pts[16][1] < pts[14][1] + scale * 0.15)
-        pinky_open = (np.linalg.norm(pts[20] - wrist) > np.linalg.norm(pts[18] - wrist) * 1.05) and (pts[20][1] < pts[18][1] + scale * 0.15)
+        def is_finger_open(tip_idx: int, pip_idx: int, mcp_idx: int) -> bool:
+            tip = pts[tip_idx]
+            pip = pts[pip_idx]
+            mcp = pts[mcp_idx]
 
-        # Thumb: lateral extension relative to IP joint and palm width
+            d_tip_wrist = np.linalg.norm(tip - wrist)
+            d_pip_wrist = np.linalg.norm(pip - wrist)
+            d_tip_mcp = np.linalg.norm(tip - mcp)
+            d_pip_mcp = np.linalg.norm(pip - mcp)
+
+            # Anatomical extension check:
+            # 1. Rotation-invariant: tip must be significantly further from MCP knuckle than PIP is
+            is_mcp_extended = d_tip_mcp > (d_pip_mcp * 1.12)
+            # 2. Tip extended away from wrist or higher than PIP in image coordinates
+            is_wrist_extended = d_tip_wrist > (d_pip_wrist * 1.03)
+            is_upright = tip[1] < pip[1]
+
+            return bool(is_mcp_extended and (is_wrist_extended or is_upright))
+
+        index_open = is_finger_open(8, 6, 5)
+        middle_open = is_finger_open(12, 10, 9)
+        ring_open = is_finger_open(16, 14, 13)
+        pinky_open = is_finger_open(20, 18, 17)
+
+        # Thumb: invariant extension using distance to MCP and opposite side of palm (pinky MCP)
         thumb_tip = pts[4]
         thumb_ip = pts[3]
         thumb_mcp = pts[2]
         index_mcp = pts[5]
+        pinky_mcp = pts[17]
 
-        # Horizontal separation from Index MCP
-        if handedness == "Right":
-            thumb_open = thumb_tip[0] < thumb_ip[0] and (np.linalg.norm(thumb_tip - index_mcp) / scale > 0.45)
-        else:
-            thumb_open = thumb_tip[0] > thumb_ip[0] and (np.linalg.norm(thumb_tip - index_mcp) / scale > 0.45)
+        d_tip_mcp = np.linalg.norm(thumb_tip - thumb_mcp)
+        d_ip_mcp = np.linalg.norm(thumb_ip - thumb_mcp)
+        d_tip_index = np.linalg.norm(thumb_tip - index_mcp) / scale
+        d_tip_pinky = np.linalg.norm(thumb_tip - pinky_mcp) / scale
+
+        # Invariant thumb check + lateral separation
+        thumb_open = (d_tip_index > 0.30 and d_tip_pinky > 0.45 and d_tip_mcp > d_ip_mcp * 1.05)
 
         return FingerStates(
             thumb=bool(thumb_open),

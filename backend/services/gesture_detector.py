@@ -67,11 +67,38 @@ class GestureDetector:
         is_pinch = pinch_ratio < 0.28
 
         # Try ML Prediction first
+        # Deterministic Ground-Truth Rule Classification
+        rule_gesture, rule_conf = self._rule_based_classify(hand, finger_states, extended_count)
+
+        # Try ML Prediction with physical finger state validation
         if self.model_loader.is_loaded:
             feat_vec = FeatureExtractor.extract_features(pts, world_pts, handedness)
             pred_gesture, conf, probs = self.model_loader.predict(feat_vec)
 
-            if conf >= self.min_confidence and pred_gesture != "Unknown":
+            is_valid_ml = False
+            if conf >= 0.45 and pred_gesture != "Unknown":
+                if pred_gesture == "Fist" and extended_count <= 1:
+                    is_valid_ml = True
+                elif pred_gesture in ["Thumbs Up", "Thumbs Down"] and finger_states.thumb and extended_count <= 2:
+                    is_valid_ml = True
+                elif pred_gesture in ["One Finger", "Point Left", "Point Right"] and finger_states.index and extended_count <= 2:
+                    is_valid_ml = True
+                elif pred_gesture in ["Victory", "Peace", "Two Fingers"] and finger_states.index and finger_states.middle and extended_count <= 3:
+                    is_valid_ml = True
+                elif pred_gesture == "Three Fingers" and extended_count in [2, 3, 4]:
+                    is_valid_ml = True
+                elif pred_gesture == "Four Fingers" and extended_count in [3, 4, 5]:
+                    is_valid_ml = True
+                elif pred_gesture in ["Open Palm", "Stop", "Five Fingers"] and extended_count >= 4:
+                    is_valid_ml = True
+                elif pred_gesture == "Rock Sign" and finger_states.index and finger_states.pinky:
+                    is_valid_ml = True
+                elif pred_gesture == "Call Me" and finger_states.thumb and finger_states.pinky:
+                    is_valid_ml = True
+                elif pred_gesture == "OK Sign" and (is_pinch or pinch_ratio < 0.35):
+                    is_valid_ml = True
+
+            if is_valid_ml:
                 icon = GESTURE_ICONS.get(pred_gesture, "✨")
                 return GestureResult(
                     name=pred_gesture,
@@ -85,10 +112,8 @@ class GestureDetector:
                     is_pinch=is_pinch,
                 )
 
-        # Rule-Based Heuristic Fallback (Demo Mode / Guaranteed Working)
-        rule_gesture, rule_conf = self._rule_based_classify(hand, finger_states, extended_count)
+        # Rock-solid rule-based classification fallback
         icon = GESTURE_ICONS.get(rule_gesture, "✨")
-
         return GestureResult(
             name=rule_gesture,
             confidence=rule_conf,
@@ -107,36 +132,36 @@ class GestureDetector:
         scale = hand.hand_scale
         wrist = pts[0]
 
-        # 1. OK Sign: Thumb tip touches index tip, while middle, ring, pinky are extended
+        # 1. OK Sign: Thumb tip touches index tip, while other fingers extended
         pinch_dist = np.linalg.norm(pts[4] - pts[8]) / scale
-        if pinch_dist < 0.28 and f.middle and f.ring:
+        if pinch_dist < 0.28 and (f.middle or f.ring):
             return "OK Sign", 0.96
 
-        # 2. Fist: 0 fingers extended
-        if ext_count == 0:
+        # 2. Fist vs Thumbs Up / Thumbs Down: When index, middle, ring, pinky are all closed
+        if not (f.index or f.middle or f.ring or f.pinky):
+            if f.thumb:
+                # Vertical upward extension for Thumbs Up
+                if (pts[4][1] < pts[2][1] - 0.10 * scale) and (pts[4][1] < pts[5][1] - 0.08 * scale):
+                    return "Thumbs Up", 0.97
+                # Vertical downward extension for Thumbs Down
+                elif (pts[4][1] > pts[2][1] + 0.10 * scale) and (pts[4][1] > pts[0][1] - 0.05 * scale):
+                    return "Thumbs Down", 0.96
+                else:
+                    return "Fist", 0.98
             return "Fist", 0.98
-
-        # 3. Thumbs Up / Down: Only thumb extended, check vertical orientation
-        if f.thumb and not (f.index or f.middle or f.ring or f.pinky):
-            thumb_vec_y = pts[4][1] - pts[2][1]
-            if thumb_vec_y < -scale * 0.35:
-                return "Thumbs Up", 0.97
-            elif thumb_vec_y > scale * 0.35:
-                return "Thumbs Down", 0.96
 
         # 4. Victory / Peace / Two Fingers: Index & Middle open, others closed
         if f.index and f.middle and not (f.ring or f.pinky):
             separation = np.linalg.norm(pts[8] - pts[12]) / scale
-            if separation > 0.35:
+            if separation > 0.28:
                 return "Victory", 0.97
             return "Two Fingers", 0.94
 
         # 5. One Finger / Pointing: Only Index open
         if f.index and not (f.middle or f.ring or f.pinky):
-            # Check horizontal pointing direction
             dx = pts[8][0] - pts[5][0]
             dy = pts[8][1] - pts[5][1]
-            if abs(dx) > abs(dy) * 1.4:
+            if abs(dx) > abs(dy) * 1.3:
                 return ("Point Right" if dx > 0 else "Point Left"), 0.95
             return "One Finger", 0.96
 

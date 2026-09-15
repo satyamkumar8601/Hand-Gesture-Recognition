@@ -114,10 +114,10 @@ class CameraSettings:
 class DetectionSettings:
     model_path: str = str(TASK_MODEL_PATH)
     num_hands: int = 2
-    min_hand_detection_confidence: float = 0.50
-    min_hand_presence_confidence: float = 0.50
-    min_tracking_confidence: float = 0.50
-    smoothing_factor: float = 0.70
+    min_hand_detection_confidence: float = 0.35
+    min_hand_presence_confidence: float = 0.35
+    min_tracking_confidence: float = 0.35
+    smoothing_factor: float = 0.65
 
 @dataclass
 class ColorPalette:

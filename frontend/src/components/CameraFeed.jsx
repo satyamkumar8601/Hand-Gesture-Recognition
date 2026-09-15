@@ -22,6 +22,33 @@ const HAND_CONNECTIONS = [
   [0, 17],                               // Palm Base
 ];
 
+// Calculate exact pixel rectangle of video content inside object-contain letterboxing
+const getVideoRenderRect = (video) => {
+  if (!video) return { x: 0, y: 0, width: 640, height: 480 };
+  const vW = video.videoWidth || 640;
+  const vH = video.videoHeight || 480;
+  const cW = video.clientWidth || 640;
+  const cH = video.clientHeight || 480;
+  if (!vW || !vH || !cW || !cH) return { x: 0, y: 0, width: cW, height: cH };
+
+  const videoRatio = vW / vH;
+  const containerRatio = cW / cH;
+  let renderW, renderH, x, y;
+
+  if (containerRatio > videoRatio) {
+    renderH = cH;
+    renderW = cH * videoRatio;
+    x = (cW - renderW) / 2;
+    y = 0;
+  } else {
+    renderW = cW;
+    renderH = cW / videoRatio;
+    x = 0;
+    y = (cH - renderH) / 2;
+  }
+  return { x, y, width: renderW, height: renderH };
+};
+
 export const CameraFeed = () => {
   const {
     liveState,
@@ -116,13 +143,12 @@ export const CameraFeed = () => {
     // 2. Draw Hand Skeleton Landmarks if enabled
     const landmarks = landmarksRef.current;
     if (showLandmarks && landmarks && landmarks.length >= 21) {
-      const w = canvas.width;
-      const h = canvas.height;
+      const rect = videoRef.current ? getVideoRenderRect(videoRef.current) : { x: 0, y: 0, width: canvas.width, height: canvas.height };
 
-      // Video is mirrored (-scale-x-100), so mirror X coordinates
+      // Video is mirrored (-scale-x-100), backend flips the frame, so x matches screen directly
       const pts = landmarks.map(pt => ({
-        x: (1.0 - pt[0]) * w,
-        y: pt[1] * h,
+        x: rect.x + pt[0] * rect.width,
+        y: rect.y + pt[1] * rect.height,
       }));
 
       // Draw bones
@@ -205,8 +231,8 @@ export const CameraFeed = () => {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
             facingMode: 'user',
           },
           audio: false,
@@ -314,9 +340,13 @@ export const CameraFeed = () => {
 
         const grabCanvas = grabCanvasRef.current;
         const grabCtx = grabCanvas.getContext('2d');
-        grabCanvas.width = 320;
-        grabCanvas.height = 240;
-        grabCtx.drawImage(video, 0, 0, 320, 240);
+        const vW = video.videoWidth || 640;
+        const vH = video.videoHeight || 480;
+        const targetW = 320;
+        const targetH = Math.max(160, Math.round((targetW * vH) / vW));
+        grabCanvas.width = targetW;
+        grabCanvas.height = targetH;
+        grabCtx.drawImage(video, 0, 0, targetW, targetH);
 
         const b64 = grabCanvas.toDataURL('image/jpeg', 0.5);
         isPredictingRef.current = true;
@@ -351,11 +381,11 @@ export const CameraFeed = () => {
 
                 // Mode 2: Air Canvas Drawing with Index Finger
                 if (liveState.mode === 2 && data.landmarks.length > 8 && overlayCanvasRef.current) {
-                  const ovCanvas = overlayCanvasRef.current;
                   const idxTip = data.landmarks[8];
+                  const rect = getVideoRenderRect(video);
                   const screenPt = {
-                    x: (1.0 - idxTip[0]) * ovCanvas.width,
-                    y: idxTip[1] * ovCanvas.height,
+                    x: rect.x + idxTip[0] * rect.width,
+                    y: rect.y + idxTip[1] * rect.height,
                   };
 
                   const isDrawingGesture =
