@@ -66,5 +66,9 @@ screenshots/*.png
 screenshots/*.jpg
 snapshots/*.png
 snapshots/*.jpg
+backend/screenshots/*.png
+backend/screenshots/*.jpg
+backend/snapshots/*.png
+backend/snapshots/*.jpg
 !screenshots/.gitkeep
 !snapshots/.gitkeep

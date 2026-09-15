@@ -3,6 +3,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://hand-gesture-recognition-0k1y.onrender.com/api/$1"
+    },
+    {
+      "source": "/video_feed",
+      "destination": "https://hand-gesture-recognition-0k1y.onrender.com/video_feed"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

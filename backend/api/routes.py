@@ -135,22 +135,31 @@ def stop_camera():
 @router.post("/api/screenshot")
 def capture_screenshot():
     """Capture and save high-resolution annotated screenshot."""
-    pred_service = PredictionService.get_instance()
-    ret, frame, _ = pred_service.process_live_frame()
-    if not ret or frame is None:
-        return JSONResponse(status_code=400, content={"success": False, "error": "Camera not ready"})
+    try:
+        pred_service = PredictionService.get_instance()
+        cam = CameraService.get_instance()
+        if not cam.is_active():
+            cam.start()
+            time.sleep(0.12)
 
-    timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
-    filename = f"screenshot_{timestamp}.png"
-    filepath = SCREENSHOTS_DIR / filename
-    cv2.imwrite(str(filepath), frame)
+        ret, frame, _ = pred_service.process_live_frame()
+        if not ret or frame is None:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Camera not ready"})
 
-    return {
-        "success": True,
-        "filename": filename,
-        "path": str(filepath),
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+        filename = f"screenshot_{timestamp}.png"
+        SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+        filepath = SCREENSHOTS_DIR / filename
+        saved = cv2.imwrite(str(filepath), frame)
+
+        return {
+            "success": True,
+            "filename": filename,
+            "path": str(filepath),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 
 @router.get("/api/settings")

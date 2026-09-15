@@ -4,12 +4,14 @@
  */
 
 const STORAGE_KEY = 'omni_custom_api_url';
+export const DEFAULT_CLOUD_BACKEND = 'https://hand-gesture-recognition-0k1y.onrender.com';
 
 /**
  * Returns the currently active base API URL:
  * 1. Runtime override in localStorage (configured via Settings UI)
  * 2. Build-time environment variable VITE_API_URL (configured in Vercel dashboard)
- * 3. Default empty string '' (falls back to local relative proxy /api/...)
+ * 3. Production fallback: points to deployed Render backend when hosted on Vercel/cloud
+ * 4. Local development: empty string '' (falls back to local relative proxy /api/...)
  */
 export const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
@@ -22,6 +24,15 @@ export const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
     return envUrl.trim().replace(/\/$/, '');
+  }
+
+  // Automatic Cloud Connection: when hosted on Vercel or cloud (non-localhost), use live Render backend
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname || '';
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+    if (!isLocal) {
+      return DEFAULT_CLOUD_BACKEND;
+    }
   }
 
   return '';
