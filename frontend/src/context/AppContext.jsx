@@ -217,6 +217,19 @@ export const AppProvider = ({ children }) => {
             return prev;
           });
           setLiveState(prev => {
+            // When browser webcam is active, frame predictions and camera_active come directly
+            // from the client-side webcam feed. Do not overwrite gesture or active status from idle OpenCV.
+            if (prev.is_browser_cam) {
+              return {
+                ...prev,
+                mode: data.mode !== undefined ? data.mode : prev.mode,
+                mode_name: data.mode_name || prev.mode_name,
+                canvas_color: data.canvas_color || prev.canvas_color,
+                whiteboard_mode: data.whiteboard_mode !== undefined ? data.whiteboard_mode : prev.whiteboard_mode,
+                mouse_enabled: data.mouse_enabled !== undefined ? data.mouse_enabled : prev.mouse_enabled,
+              };
+            }
+
             const gestureChanged = prev.primary_gesture !== data.primary_gesture;
             const handChanged = prev.hand_detected !== data.hand_detected;
             const cameraChanged = prev.camera_active !== data.camera_active;
@@ -275,10 +288,14 @@ export const AppProvider = ({ children }) => {
     };
   }, [liveState.camera_active]);
 
+  const isStartingCameraRef = useRef(false);
   const stopCameraTimeoutRef = useRef(null);
 
-  // Fast optimistic camera start/stop helpers with StrictMode debounce protection
-  const startCamera = async () => {
+  // Fast optimistic camera start/stop helpers wrapped in useCallback with StrictMode protection
+  const startCamera = useCallback(async (quiet = false) => {
+    if (isStartingCameraRef.current) return;
+    isStartingCameraRef.current = true;
+
     if (stopCameraTimeoutRef.current) {
       clearTimeout(stopCameraTimeoutRef.current);
       stopCameraTimeoutRef.current = null;
@@ -289,18 +306,20 @@ export const AppProvider = ({ children }) => {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success !== false) {
         setLiveState(prev => ({ ...prev, camera_active: true }));
-        addNotification('Camera activated successfully', 'success');
+        if (!quiet) addNotification('Backend camera activated', 'success');
       } else {
         setLiveState(prev => ({ ...prev, camera_active: false }));
-        addNotification(data.error || 'Failed to start camera hardware', 'error');
+        if (!quiet) addNotification(data.error || 'Failed to start camera hardware', 'error');
       }
     } catch (e) {
       setLiveState(prev => ({ ...prev, camera_active: false }));
-      addNotification('Camera start request failed. Is the backend running?', 'error');
+      if (!quiet) addNotification('Camera start request failed. Is the backend running?', 'error');
+    } finally {
+      isStartingCameraRef.current = false;
     }
-  };
+  }, [addNotification]);
 
-  const stopCamera = async (immediate = false) => {
+  const stopCamera = useCallback(async (immediate = false) => {
     if (stopCameraTimeoutRef.current) {
       clearTimeout(stopCameraTimeoutRef.current);
       stopCameraTimeoutRef.current = null;
@@ -321,7 +340,7 @@ export const AppProvider = ({ children }) => {
       // 800ms debounce prevents StrictMode mount-unmount-mount churn
       stopCameraTimeoutRef.current = setTimeout(executeStop, 800);
     }
-  };
+  }, []);
 
   // Studio Mode Management
   const setStudioMode = async (modeId) => {
@@ -337,23 +356,18 @@ export const AppProvider = ({ children }) => {
 
   // Air Canvas Actions
   const clearCanvas = async () => {
+    window.dispatchEvent(new CustomEvent('omni_clear_canvas'));
+    addNotification('Canvas Cleared', 'info');
     try {
-      const res = await fetch(apiUrl('/api/canvas/clear'), { method: 'POST' });
-      if (res.ok) {
-        addNotification('Canvas Cleared', 'info');
-      }
+      await fetch(apiUrl('/api/canvas/clear'), { method: 'POST' });
     } catch (e) {}
   };
 
   const undoCanvas = async () => {
+    window.dispatchEvent(new CustomEvent('omni_undo_canvas'));
+    addNotification('Stroke Undone', 'info');
     try {
-      const res = await fetch(apiUrl('/api/canvas/undo'), { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          addNotification('Stroke Undone', 'info');
-        }
-      }
+      await fetch(apiUrl('/api/canvas/undo'), { method: 'POST' });
     } catch (e) {}
   };
 

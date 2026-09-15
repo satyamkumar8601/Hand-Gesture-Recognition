@@ -355,7 +355,11 @@ def predict_frame(payload: PredictFramePayload):
             }
 
         res = ps.gesture_detector.recognize(hands[0])
-        return {
+        landmarks = []
+        if hasattr(hands[0], 'raw_normalized') and hands[0].raw_normalized is not None:
+            landmarks = [[round(float(p[0]), 4), round(float(p[1]), 4)] for p in hands[0].raw_normalized]
+
+        telemetry = {
             "hand_detected": True,
             "hands_count": len(hands),
             "primary_gesture": res.name,
@@ -365,6 +369,23 @@ def predict_frame(payload: PredictFramePayload):
             "finger_states": res.finger_states.as_dict(),
             "probabilities": res.probabilities,
             "handedness": res.handedness,
+            "landmarks": landmarks,
         }
+
+        # Keep server state in sync so telemetry status poller stays aligned
+        if hasattr(ps, 'latest_state') and isinstance(ps.latest_state, dict):
+            ps.latest_state.update({
+                "camera_active": True,
+                "hand_detected": True,
+                "hands_count": len(hands),
+                "primary_gesture": res.name,
+                "confidence": telemetry["confidence"],
+                "is_ml": res.is_ml,
+                "icon": res.icon,
+                "finger_states": telemetry["finger_states"],
+                "probabilities": res.probabilities,
+            })
+
+        return telemetry
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
