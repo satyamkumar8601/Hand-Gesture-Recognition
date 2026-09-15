@@ -53,19 +53,25 @@ class HandDetector:
         self._prev_landmarks: Dict[str, np.ndarray] = {}
         self._last_ts = 0
 
-        base_options = python.BaseOptions(model_asset_path=model_path)
-        options = vision.HandLandmarkerOptions(
-            base_options=base_options,
-            running_mode=vision.RunningMode.VIDEO,
-            num_hands=num_hands,
-            min_hand_detection_confidence=min_detection_confidence,
-            min_hand_presence_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
-        self.landmarker = vision.HandLandmarker.create_from_options(options)
+        try:
+            base_options = python.BaseOptions(model_asset_path=model_path)
+            options = vision.HandLandmarkerOptions(
+                base_options=base_options,
+                running_mode=vision.RunningMode.VIDEO,
+                num_hands=num_hands,
+                min_hand_detection_confidence=min_detection_confidence,
+                min_hand_presence_confidence=min_detection_confidence,
+                min_tracking_confidence=min_tracking_confidence,
+            )
+            self.landmarker = vision.HandLandmarker.create_from_options(options)
+        except Exception as e:
+            print(f"[HandDetector Warning] Could not load HandLandmarker ({model_path}): {e}")
+            self.landmarker = None
 
     def process_frame(self, frame: np.ndarray) -> List[HandLandmarksData]:
         """Detect and extract hand landmarks with scale restoration and EMA smoothing."""
+        if self.landmarker is None:
+            return []
         h, w = frame.shape[:2]
         now_ms = int(time.perf_counter() * 1000)
         if now_ms <= self._last_ts:

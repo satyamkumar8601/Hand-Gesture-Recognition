@@ -327,13 +327,11 @@ export const AppProvider = ({ children }) => {
   const setStudioMode = async (modeId) => {
     const modeNames = { 1: 'HUD Analytics', 2: 'Air Canvas', 3: 'Virtual Mouse', 4: 'Biometrics & Rehab' };
     setLiveState(prev => ({ ...prev, mode: modeId, mode_name: modeNames[modeId] || 'Mode' }));
+    addNotification(`Active: ${modeNames[modeId]}`, 'success');
     try {
-      const res = await fetch(apiUrl(`/api/studio/mode/${modeId}`), { method: 'POST' });
-      if (res.ok) {
-        addNotification(`Switched to ${modeNames[modeId]}`, 'success');
-      }
+      await fetch(apiUrl(`/api/studio/mode/${modeId}`), { method: 'POST' });
     } catch (e) {
-      addNotification('Mode change failed', 'error');
+      // Background acknowledge
     }
   };
 
@@ -422,6 +420,7 @@ export const AppProvider = ({ children }) => {
         theme,
         toggleTheme,
         liveState,
+        setLiveState,
         modelInfo,
         refreshModelInfo,
         backendStatus,

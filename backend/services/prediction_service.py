@@ -79,8 +79,17 @@ class PredictionService:
 
     def __init__(self):
         self.camera_service = CameraService.get_instance()
-        self.hand_detector = HandDetector()
-        self.gesture_detector = GestureDetector()
+        try:
+            self.hand_detector = HandDetector()
+        except Exception as e:
+            print(f"[PredictionService Warning] HandDetector init: {e}")
+            self.hand_detector = None
+
+        try:
+            self.gesture_detector = GestureDetector()
+        except Exception as e:
+            print(f"[PredictionService Warning] GestureDetector init: {e}")
+            self.gesture_detector = None
 
         self.width = self.camera_service.width
         self.height = self.camera_service.height
@@ -104,17 +113,28 @@ class PredictionService:
             4: "Biometrics & Rehab",
         }
 
-        # Initialize interactive studio modules
+        # Initialize interactive studio modules safely
+        self.air_canvas = None
+        self.virtual_mouse = None
+        self.hud_renderer = None
+        self.rehab_tracker = None
         if MODULES_AVAILABLE:
-            self.air_canvas = AirCanvas(width=self.width, height=self.height)
-            self.virtual_mouse = VirtualMouse(camera_w=self.width, camera_h=self.height)
-            self.hud_renderer = HUDRenderer(width=self.width, height=self.height)
-            self.rehab_tracker = RehabTracker(width=self.width, height=self.height)
-        else:
-            self.air_canvas = None
-            self.virtual_mouse = None
-            self.hud_renderer = None
-            self.rehab_tracker = None
+            try:
+                self.air_canvas = AirCanvas(width=self.width, height=self.height)
+            except Exception as e:
+                print(f"[PredictionService Warning] AirCanvas init: {e}")
+            try:
+                self.virtual_mouse = VirtualMouse(camera_w=self.width, camera_h=self.height)
+            except Exception as e:
+                print(f"[PredictionService Warning] VirtualMouse init: {e}")
+            try:
+                self.hud_renderer = HUDRenderer(width=self.width, height=self.height)
+            except Exception as e:
+                print(f"[PredictionService Warning] HUDRenderer init: {e}")
+            try:
+                self.rehab_tracker = RehabTracker(width=self.width, height=self.height)
+            except Exception as e:
+                print(f"[PredictionService Warning] RehabTracker init: {e}")
 
         # Latest live telemetry state for Web API
         self.latest_state: Dict[str, Any] = {
@@ -148,9 +168,17 @@ class PredictionService:
         if mode_id in [1, 2, 3, 4]:
             self.mode = mode_id
             if self.mode == 3 and self.virtual_mouse:
-                self.virtual_mouse.enabled = True
+                try:
+                    self.virtual_mouse.enabled = True
+                except Exception:
+                    pass
             if self.hud_renderer:
-                self.hud_renderer.notify(f"Mode: {self.mode_names.get(mode_id, 'Unknown')}")
+                try:
+                    self.hud_renderer.notify(f"Mode: {self.mode_names.get(mode_id, 'Unknown')}")
+                except Exception:
+                    pass
+            self.latest_state["mode"] = self.mode
+            self.latest_state["mode_name"] = self.mode_names.get(mode_id, "Unknown")
             return True
         return False
 
@@ -266,8 +294,8 @@ class PredictionService:
         fps_val = round(self.fps_smooth, 1)
 
         # Process 3D Hand Landmarks
-        hands = self.hand_detector.process_frame(frame)
-        gesture_results: List[GestureResult] = [self.gesture_detector.recognize(h) for h in hands]
+        hands = self.hand_detector.process_frame(frame) if self.hand_detector else []
+        gesture_results: List[GestureResult] = [self.gesture_detector.recognize(h) for h in hands] if (self.gesture_detector and hands) else []
         converted_hands = [to_hand_data(h) for h in hands]
 
         display_frame = frame.copy()

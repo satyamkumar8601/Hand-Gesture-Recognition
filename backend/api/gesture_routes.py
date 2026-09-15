@@ -301,3 +301,70 @@ def export_history(format: str = Query("csv", pattern="^(csv|json)$")):
 def get_analytics_data():
     """Retrieve consolidated analytics metrics for charts."""
     return get_analytics()
+
+
+class PredictFramePayload(BaseModel):
+    image_base64: str
+
+
+@router.post("/api/predict/frame")
+def predict_frame(payload: PredictFramePayload):
+    """
+    Real-time browser webcam frame inference endpoint.
+    Accepts base64-encoded frame from browser webcam, runs 3D MediaPipe Hand Landmarker,
+    classifies gesture via ML / heuristics, and returns full telemetry to browser.
+    """
+    import base64
+    import numpy as np
+    import cv2
+    try:
+        data = payload.image_base64
+        if "," in data:
+            data = data.split(",", 1)[1]
+        img_bytes = base64.b64decode(data)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return JSONResponse(status_code=400, content={"error": "Invalid image data"})
+
+        from services.prediction_service import PredictionService
+        ps = PredictionService.get_instance()
+        if ps.hand_detector is None:
+            return {
+                "hand_detected": False,
+                "hands_count": 0,
+                "primary_gesture": "No Hand",
+                "confidence": 0.0,
+                "is_ml": False,
+                "icon": "✋",
+                "finger_states": {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False},
+                "probabilities": {},
+            }
+
+        hands = ps.hand_detector.process_frame(frame)
+        if not hands:
+            return {
+                "hand_detected": False,
+                "hands_count": 0,
+                "primary_gesture": "No Hand",
+                "confidence": 0.0,
+                "is_ml": False,
+                "icon": "✋",
+                "finger_states": {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False},
+                "probabilities": {},
+            }
+
+        res = ps.gesture_detector.recognize(hands[0])
+        return {
+            "hand_detected": True,
+            "hands_count": len(hands),
+            "primary_gesture": res.name,
+            "confidence": round(res.confidence * 100, 1),
+            "is_ml": res.is_ml,
+            "icon": res.icon,
+            "finger_states": res.finger_states.as_dict(),
+            "probabilities": res.probabilities,
+            "handedness": res.handedness,
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
