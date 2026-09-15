@@ -98,8 +98,16 @@ export const CameraFeed = () => {
 
       ctx.beginPath();
       ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      if (stroke.points.length === 2) {
+        ctx.lineTo(stroke.points[1].x, stroke.points[1].y);
+      } else {
+        for (let i = 1; i < stroke.points.length - 1; i++) {
+          const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+          const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+          ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, xc, yc);
+        }
+        const last = stroke.points[stroke.points.length - 1];
+        ctx.lineTo(last.x, last.y);
       }
       ctx.stroke();
       ctx.restore();
@@ -413,8 +421,9 @@ export const CameraFeed = () => {
       }
 
       if (isActive) {
-        // 250ms breathing pause between frames guarantees zero backlog
-        timerId = setTimeout(runInference, 250);
+        // Fast adaptive pause: 80ms on localhost for silky 12 FPS response, 200ms on cloud
+        const pause = isCloudHost ? 200 : 80;
+        timerId = setTimeout(runInference, pause);
       }
     };
 

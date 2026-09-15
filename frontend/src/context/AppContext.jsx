@@ -267,7 +267,7 @@ export const AppProvider = ({ children }) => {
       }
 
       if (isSubscribed) {
-        const delay = liveState.camera_active ? 280 : 2500;
+        const delay = liveState.camera_active ? 100 : 2000;
         timerId = setTimeout(poll, delay);
       }
     };
