@@ -84,6 +84,32 @@ def root():
     }
 
 
+@app.get("/api/debug")
+def debug_status():
+    """Diagnostic endpoint to pinpoint exact startup or runtime exceptions."""
+    import traceback
+    info = {"status": "ok"}
+    try:
+        from services.prediction_service import PredictionService
+        ps = PredictionService.get_instance()
+        info["prediction_service"] = "initialized"
+        info["mode"] = ps.get_mode()
+        info["telemetry"] = ps.latest_state
+    except Exception as e:
+        info["prediction_service_error"] = f"{type(e).__name__}: {e}"
+        info["prediction_service_traceback"] = traceback.format_exc()
+
+    try:
+        from services.camera_service import CameraService
+        cam = CameraService.get_instance()
+        info["camera_running"] = cam.running
+        info["camera_active"] = cam.is_active()
+    except Exception as e:
+        info["camera_error"] = str(e)
+
+    return info
+
+
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
