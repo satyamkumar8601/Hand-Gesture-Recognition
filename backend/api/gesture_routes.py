@@ -71,6 +71,21 @@ def model_information():
     metric_record = get_latest_model_metric()
     if metric_record:
         info["latest_metrics"] = metric_record
+
+    try:
+        from services.prediction_service import PredictionService
+        ps = PredictionService.get_instance()
+        detector = getattr(ps, "hand_detector", None)
+        info["detector_status"] = {
+            "detector_initialized": detector is not None,
+            "image_landmarker_loaded": getattr(detector, "image_landmarker", None) is not None if detector else False,
+            "video_landmarker_loaded": getattr(detector, "landmarker", None) is not None if detector else False,
+            "model_path": getattr(detector, "model_path", ""),
+            "last_error": getattr(detector, "_last_error", None) if detector else None,
+        }
+    except Exception as det_err:
+        info["detector_status"] = {"error": str(det_err)}
+
     return info
 
 
@@ -179,7 +194,7 @@ def collect_sample(payload: CollectSamplePayload):
         if not ret or frame is None:
             raise HTTPException(status_code=400, detail="Webcam frame not available. Please ensure camera is running.")
 
-    hands = detector.process_frame(frame)
+    hands = detector.process_image(frame) if hasattr(detector, "process_image") else detector.process_frame(frame)
     if not hands:
         return {"success": False, "message": "No hand detected in camera frame. Please show hand clearly to camera."}
 
@@ -232,7 +247,7 @@ def collect_batch(payload: CollectBatchPayload):
             decoded = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if decoded is not None:
                 frame = cv2.flip(decoded, 1)
-                hands = detector.process_frame(frame)
+                hands = detector.process_image(frame) if hasattr(detector, "process_image") else detector.process_frame(frame)
                 if hands:
                     primary = hands[0]
                     for i in range(target_count):
@@ -407,7 +422,8 @@ def predict_frame(payload: PredictFramePayload):
                 "probabilities": {},
             }
 
-        hands = ps.hand_detector.process_frame(frame)
+        detector = ps.hand_detector
+        hands = detector.process_image(frame) if hasattr(detector, "process_image") else detector.process_frame(frame)
         if not hands:
             ps.last_logged_gesture = None
             if hasattr(ps, 'latest_state') and isinstance(ps.latest_state, dict):

@@ -342,13 +342,13 @@ export const CameraFeed = () => {
         const grabCtx = grabCanvas.getContext('2d');
         const vW = video.videoWidth || 640;
         const vH = video.videoHeight || 480;
-        const targetW = 320;
-        const targetH = Math.max(160, Math.round((targetW * vH) / vW));
+        const targetW = 640;
+        const targetH = Math.max(360, Math.round((targetW * vH) / vW));
         grabCanvas.width = targetW;
         grabCanvas.height = targetH;
         grabCtx.drawImage(video, 0, 0, targetW, targetH);
 
-        const b64 = grabCanvas.toDataURL('image/jpeg', 0.5);
+        const b64 = grabCanvas.toDataURL('image/jpeg', 0.78);
         isPredictingRef.current = true;
 
         try {
