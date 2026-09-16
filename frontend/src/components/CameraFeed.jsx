@@ -373,6 +373,8 @@ export const CameraFeed = () => {
                 probabilities: data.probabilities || prev.probabilities,
                 camera_active: true,
                 is_browser_cam: true,
+                rehab_grip_closure: data.rehab_grip_closure !== undefined ? data.rehab_grip_closure : prev.rehab_grip_closure,
+                rehab_extended_fingers: data.rehab_extended_fingers !== undefined ? data.rehab_extended_fingers : prev.rehab_extended_fingers,
               }));
 
               // Cache landmarks for skeleton overlay
@@ -391,6 +393,7 @@ export const CameraFeed = () => {
                   const isDrawingGesture =
                     data.primary_gesture === 'Index Pointing' ||
                     data.primary_gesture === 'Point' ||
+                    data.primary_gesture === 'One Finger' ||
                     (data.finger_states && data.finger_states.index && !data.finger_states.middle);
 
                   const isHoverGesture =
@@ -440,6 +443,8 @@ export const CameraFeed = () => {
                 confidence: 0,
                 camera_active: true,
                 is_browser_cam: true,
+                rehab_grip_closure: 0,
+                rehab_extended_fingers: 0,
               }));
             }
           }

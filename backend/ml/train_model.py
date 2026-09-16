@@ -214,12 +214,12 @@ def train_and_compare_models(test_size: float = 0.20) -> Dict[str, Any]:
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # Model Definitions
+    # Model Definitions (Optimized for both high accuracy and fast non-blocking cloud benchmarking)
     candidate_models = {
-        "Random Forest": RandomForestClassifier(n_estimators=120, max_depth=16, random_state=42, n_jobs=-1),
-        "Support Vector Machine": SVC(kernel="rbf", C=6.0, probability=True, random_state=42),
+        "Random Forest": RandomForestClassifier(n_estimators=60, max_depth=12, random_state=42, n_jobs=1),
+        "Support Vector Machine": SVC(kernel="rbf", C=3.0, probability=True, max_iter=300, random_state=42),
         "K-Nearest Neighbors": KNeighborsClassifier(n_neighbors=5, weights="distance"),
-        "Logistic Regression": LogisticRegression(max_iter=1500, C=2.0, random_state=42),
+        "Logistic Regression": LogisticRegression(max_iter=500, C=2.0, random_state=42),
     }
 
     comparison_results: List[Dict[str, Any]] = []

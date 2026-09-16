@@ -85,6 +85,7 @@ export const AppProvider = ({ children }) => {
     whiteboard_mode: false,
     rehab_grip_closure: 0,
     rehab_extended_fingers: 0,
+    is_browser_cam: false,
   });
 
   // Model metadata state
@@ -255,7 +256,7 @@ export const AppProvider = ({ children }) => {
             ) {
               return prev; // Skip re-rendering when telemetry has not meaningfully changed
             }
-            return data;
+            return { ...data, is_browser_cam: prev.is_browser_cam || false };
           });
         } else if (isSubscribed) {
           setBackendStatus(prev => (prev.isConnected ? { ...prev, isConnected: false } : prev));

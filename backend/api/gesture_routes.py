@@ -23,6 +23,7 @@ try:
         delete_history_item,
         get_analytics,
         get_latest_model_metric,
+        log_gesture,
     )
 except ImportError:
     from config import DATASET_FILE, ALL_GESTURES, GESTURE_ICONS, GESTURES_BASIC, GESTURES_ADVANCED
@@ -38,6 +39,7 @@ except ImportError:
         delete_history_item,
         get_analytics,
         get_latest_model_metric,
+        log_gesture,
     )
 
 router = APIRouter()
@@ -46,6 +48,7 @@ router = APIRouter()
 class CollectSamplePayload(BaseModel):
     gesture_name: str
     count: int = 1
+    image_base64: Optional[str] = None
 
 
 @router.get("/api/gestures/list")
@@ -69,6 +72,18 @@ def model_information():
     if metric_record:
         info["latest_metrics"] = metric_record
     return info
+
+
+@router.post("/api/model/reload")
+def reload_model_endpoint():
+    """Hot reload active machine learning model from disk."""
+    try:
+        loader = ModelLoader.get_instance()
+        loader.reload()
+        info = loader.get_info()
+        return {"success": True, "message": "Model reloaded successfully", "model_info": info}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/api/model/train")
@@ -123,33 +138,50 @@ from services.prediction_service import PredictionService
 class CollectBatchPayload(BaseModel):
     gesture_name: str
     count: int = 10
+    image_base64: Optional[str] = None
 
 
 @router.post("/api/dataset/collect")
 def collect_sample(payload: CollectSamplePayload):
     """
-    Capture hand landmarks from the live webcam feed and append to the dataset.
-    Uses shared singleton HandDetector for instant, sub-10ms collection without disk reloading.
+    Capture hand landmarks from live webcam or browser base64 frame and append to dataset.
     """
     gesture_name = payload.gesture_name
     if gesture_name not in ALL_GESTURES:
         raise HTTPException(status_code=400, detail=f"Invalid gesture name. Must be one of: {ALL_GESTURES}")
 
-    cam = CameraService.get_instance()
-    if not cam.is_active():
-        cam.start()
-        time.sleep(0.15)
-
     pred_service = PredictionService.get_instance()
     detector = pred_service.hand_detector
 
-    ret, frame = cam.read_frame()
-    if not ret or frame is None:
-        raise HTTPException(status_code=400, detail="Webcam frame not available. Please ensure camera is running.")
+    frame = None
+    if payload.image_base64:
+        import base64
+        import numpy as np
+        import cv2
+        try:
+            data = payload.image_base64
+            if "," in data:
+                data = data.split(",", 1)[1]
+            img_bytes = base64.b64decode(data)
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            decoded = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if decoded is not None:
+                frame = cv2.flip(decoded, 1)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image_base64: {e}")
+
+    if frame is None:
+        cam = CameraService.get_instance()
+        if not cam.is_active():
+            cam.start()
+            time.sleep(0.15)
+        ret, frame = cam.read_frame()
+        if not ret or frame is None:
+            raise HTTPException(status_code=400, detail="Webcam frame not available. Please ensure camera is running.")
 
     hands = detector.process_frame(frame)
     if not hands:
-        return {"success": False, "message": "No hand detected in current camera frame. Please show hand to webcam."}
+        return {"success": False, "message": "No hand detected in camera frame. Please show hand clearly to camera."}
 
     primary = hands[0]
     features = FeatureExtractor.extract_features(primary.landmarks_pixel, primary.landmarks_world, primary.handedness)
@@ -174,37 +206,68 @@ def collect_sample(payload: CollectSamplePayload):
 @router.post("/api/dataset/collect_batch")
 def collect_batch(payload: CollectBatchPayload):
     """
-    Burst collect multiple samples across successive frames for rapid dataset creation.
+    Burst collect multiple samples across frames or augmented variants from browser frame.
     """
     gesture_name = payload.gesture_name
     if gesture_name not in ALL_GESTURES:
         raise HTTPException(status_code=400, detail=f"Invalid gesture name. Must be one of: {ALL_GESTURES}")
 
-    cam = CameraService.get_instance()
-    if not cam.is_active():
-        cam.start()
-        time.sleep(0.15)
-
     pred_service = PredictionService.get_instance()
     detector = pred_service.hand_detector
     feature_names = FeatureExtractor.get_feature_names()
-
-    collected_rows = []
     target_count = max(1, min(25, payload.count))
 
-    for _ in range(target_count * 2):
-        if len(collected_rows) >= target_count:
-            break
-        ret, frame = cam.read_frame()
-        if ret and frame is not None:
-            hands = detector.process_frame(frame)
-            if hands:
-                primary = hands[0]
-                features = FeatureExtractor.extract_features(primary.landmarks_pixel, primary.landmarks_world, primary.handedness)
-                row_dict = {name: float(val) for name, val in zip(feature_names, features)}
-                row_dict["label"] = gesture_name
-                collected_rows.append(row_dict)
-        time.sleep(0.04)
+    collected_rows = []
+
+    if payload.image_base64:
+        import base64
+        import numpy as np
+        import cv2
+        try:
+            data = payload.image_base64
+            if "," in data:
+                data = data.split(",", 1)[1]
+            img_bytes = base64.b64decode(data)
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            decoded = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if decoded is not None:
+                frame = cv2.flip(decoded, 1)
+                hands = detector.process_frame(frame)
+                if hands:
+                    primary = hands[0]
+                    for i in range(target_count):
+                        # i=0 uses exact landmarks; subsequent use micro-jitter for robust data distribution
+                        if i == 0:
+                            lm_px = primary.landmarks_pixel
+                            lm_world = primary.landmarks_world
+                        else:
+                            lm_px = primary.landmarks_pixel + np.random.normal(0, 0.8, primary.landmarks_pixel.shape)
+                            lm_world = primary.landmarks_world + np.random.normal(0, 0.001, primary.landmarks_world.shape)
+                        features = FeatureExtractor.extract_features(lm_px, lm_world, primary.handedness)
+                        row_dict = {name: float(val) for name, val in zip(feature_names, features)}
+                        row_dict["label"] = gesture_name
+                        collected_rows.append(row_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image_base64: {e}")
+    else:
+        cam = CameraService.get_instance()
+        if not cam.is_active():
+            cam.start()
+            time.sleep(0.15)
+
+        for _ in range(target_count * 2):
+            if len(collected_rows) >= target_count:
+                break
+            ret, frame = cam.read_frame()
+            if ret and frame is not None:
+                hands = detector.process_frame(frame)
+                if hands:
+                    primary = hands[0]
+                    features = FeatureExtractor.extract_features(primary.landmarks_pixel, primary.landmarks_world, primary.handedness)
+                    row_dict = {name: float(val) for name, val in zip(feature_names, features)}
+                    row_dict["label"] = gesture_name
+                    collected_rows.append(row_dict)
+            time.sleep(0.04)
 
     if not collected_rows:
         return {"success": False, "message": "No hand detected during burst. Please hold hand steady in front of camera."}
@@ -346,21 +409,66 @@ def predict_frame(payload: PredictFramePayload):
 
         hands = ps.hand_detector.process_frame(frame)
         if not hands:
+            ps.last_logged_gesture = None
+            if hasattr(ps, 'latest_state') and isinstance(ps.latest_state, dict):
+                ps.latest_state.update({
+                    "camera_active": True,
+                    "hand_detected": False,
+                    "hands_count": 0,
+                    "primary_gesture": "No Hand",
+                    "confidence": 0.0,
+                    "is_ml": False,
+                    "icon": "❌",
+                    "finger_states": {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False},
+                    "probabilities": {},
+                    "rehab_grip_closure": 0.0,
+                    "rehab_extended_fingers": 0,
+                })
             return {
                 "hand_detected": False,
                 "hands_count": 0,
                 "primary_gesture": "No Hand",
                 "confidence": 0.0,
                 "is_ml": False,
-                "icon": "✋",
+                "icon": "❌",
                 "finger_states": {"thumb": False, "index": False, "middle": False, "ring": False, "pinky": False},
                 "probabilities": {},
+                "rehab_grip_closure": 0.0,
+                "rehab_extended_fingers": 0,
             }
 
         res = ps.gesture_detector.recognize(hands[0])
         landmarks = []
         if hasattr(hands[0], 'raw_normalized') and hands[0].raw_normalized is not None:
             landmarks = [[round(float(p[0]), 4), round(float(p[1]), 4)] for p in hands[0].raw_normalized]
+
+        # Calculate Biometric / Rehab metrics (grip closure % and extended finger count)
+        grip_closure_val = 0.0
+        try:
+            lm = np.array(hands[0].raw_normalized)
+            wrist = lm[0, :2]
+            hand_size = max(hands[0].hand_scale, 1e-4)
+            tip_indices = [4, 8, 12, 16, 20]
+            distances = [np.linalg.norm(lm[i, :2] - wrist) for i in tip_indices]
+            avg_dist = float(np.mean(distances)) / hand_size
+            norm_grip = 1.0 - np.clip((avg_dist - 0.6) / (1.7 - 0.6), 0.0, 1.0)
+            grip_closure_val = round(float(norm_grip * 100.0), 1)
+        except Exception:
+            pass
+
+        total_extended = res.finger_states.count_extended()
+
+        # Debounced database logging for cloud / browser webcam
+        if res.name not in ["No Hand", "Unknown"]:
+            import time
+            now = time.time()
+            if res.name != ps.last_logged_gesture or (now - ps.last_log_time > 2.5):
+                try:
+                    log_gesture(res.name, res.confidence, res.handedness)
+                except Exception as log_err:
+                    print(f"[Gesture Log Error] {log_err}")
+                ps.last_logged_gesture = res.name
+                ps.last_log_time = now
 
         telemetry = {
             "hand_detected": True,
@@ -373,6 +481,8 @@ def predict_frame(payload: PredictFramePayload):
             "probabilities": res.probabilities,
             "handedness": res.handedness,
             "landmarks": landmarks,
+            "rehab_grip_closure": grip_closure_val,
+            "rehab_extended_fingers": total_extended,
         }
 
         # Keep server state in sync so telemetry status poller stays aligned
@@ -387,6 +497,8 @@ def predict_frame(payload: PredictFramePayload):
                 "icon": res.icon,
                 "finger_states": telemetry["finger_states"],
                 "probabilities": res.probabilities,
+                "rehab_grip_closure": grip_closure_val,
+                "rehab_extended_fingers": total_extended,
             })
 
         return telemetry

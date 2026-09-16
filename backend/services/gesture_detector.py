@@ -79,9 +79,15 @@ class GestureDetector:
             if conf >= 0.45 and pred_gesture != "Unknown":
                 if pred_gesture == "Fist" and extended_count <= 1:
                     is_valid_ml = True
-                elif pred_gesture in ["Thumbs Up", "Thumbs Down"] and finger_states.thumb and extended_count <= 2:
+                elif pred_gesture == "Thumbs Up" and finger_states.thumb and extended_count <= 2 and pts[4][1] < pts[2][1]:
                     is_valid_ml = True
-                elif pred_gesture in ["One Finger", "Point Left", "Point Right"] and finger_states.index and extended_count <= 2:
+                elif pred_gesture == "Thumbs Down" and finger_states.thumb and extended_count <= 2 and pts[4][1] > pts[2][1]:
+                    is_valid_ml = True
+                elif pred_gesture == "Point Left" and finger_states.index and extended_count <= 2 and pts[8][0] < pts[5][0]:
+                    is_valid_ml = True
+                elif pred_gesture == "Point Right" and finger_states.index and extended_count <= 2 and pts[8][0] > pts[5][0]:
+                    is_valid_ml = True
+                elif pred_gesture in ["One Finger", "Index Pointing", "Point"] and finger_states.index and extended_count <= 2:
                     is_valid_ml = True
                 elif pred_gesture in ["Victory", "Peace", "Two Fingers"] and finger_states.index and finger_states.middle and extended_count <= 3:
                     is_valid_ml = True
