@@ -1,7 +1,6 @@
 <<<<<<< HEAD
 
-[https://hand-gesture-recognition-w55n.vercel.app/](https://hand-gesture-recognition-0k1y.onrender.com)
-
+https://hand-gesture-recognition-0k1y.onrender.com
 
 # 🖐️ AI-Powered Hand Gesture Recognition System
 ### Real-Time Computer Vision & Machine Learning Studio using OpenCV, MediaPipe & Scikit-Learn
