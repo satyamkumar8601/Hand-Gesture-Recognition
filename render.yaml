@@ -7,9 +7,11 @@ services:
     region: oregon
     plan: free
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    startCommand: LD_LIBRARY_PATH=/opt/render/project/src/backend/libs:$LD_LIBRARY_PATH uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
+      - key: LD_LIBRARY_PATH
+        value: /opt/render/project/src/backend/libs
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: PORT

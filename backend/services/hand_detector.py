@@ -86,6 +86,20 @@ class HandDetector:
         self.landmarker = None
         self.image_landmarker = None
 
+        # On Linux (Render cloud container), ensure libGLESv2.so.2 is globally preloaded
+        import sys
+        if sys.platform.startswith("linux"):
+            libs_dir = Path(__file__).resolve().parent.parent / "libs"
+            if libs_dir.exists():
+                import ctypes
+                for libname in ["libGLdispatch.so.0", "libGLESv2.so.2", "libEGL.so.1", "libGL.so.1"]:
+                    lp = libs_dir / libname
+                    if lp.exists():
+                        try:
+                            ctypes.CDLL(str(lp), mode=ctypes.RTLD_GLOBAL)
+                        except Exception:
+                            pass
+
         if target_path and target_path.exists():
             base_options = python.BaseOptions(model_asset_path=str(target_path))
 

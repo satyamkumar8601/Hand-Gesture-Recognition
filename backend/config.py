@@ -11,8 +11,28 @@ import os
 os.environ["GLOG_minloglevel"] = "3"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+import sys
+
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
+
+# Linux Cloud Environment (Render / Container) Shared Library Loader
+# MediaPipe Tasks on Linux dynamically loads libGLESv2.so.2 / OpenGL ES
+if sys.platform.startswith("linux"):
+    libs_dir = BACKEND_DIR / "libs"
+    if libs_dir.exists():
+        current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        if str(libs_dir) not in current_ld:
+            os.environ["LD_LIBRARY_PATH"] = f"{libs_dir}:{current_ld}".strip(":")
+        
+        import ctypes
+        for libname in ["libGLdispatch.so.0", "libGLESv2.so.2", "libEGL.so.1", "libGL.so.1"]:
+            lib_path = libs_dir / libname
+            if lib_path.exists():
+                try:
+                    ctypes.CDLL(str(lib_path), mode=ctypes.RTLD_GLOBAL)
+                except Exception:
+                    pass
 
 # Paths (Anchor primarily to BACKEND_DIR for cloud autonomy, fallback to PROJECT_ROOT)
 MODELS_DIR = BACKEND_DIR / "models"
