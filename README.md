@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 
-https://hand-gesture-recognition-w55n.vercel.app/
+https://hand-gesture-recognition-2bl4.vercel.app/
 
 # 🖐️ AI-Powered Hand Gesture Recognition System
 ### Real-Time Computer Vision & Machine Learning Studio using OpenCV, MediaPipe & Scikit-Learn
